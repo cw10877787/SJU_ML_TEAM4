@@ -14,9 +14,8 @@ class PreProcessData:
     Specifics include:
     1. leadData: Load data from a CSV
     2. describeData: Describe the dataset using info, describe, and outputs histograms, boxplots, and barplots
-    3. Transforms numerical columns using either normalization or standardization
-    4. Handles outliers through binning
-    5. Enables bivariate analysis through pairplots and correlation heatmaps
+    3. logTransformData: Transforms numerical columns using a log transform
+    4. Bivariate analysis through pairplots and correlation heatmaps
     6. Computes VIF scores to check for multicollinearity
     7. Encodes categorical variables using one-hot encoding
     8. Scales numerical data
@@ -109,90 +108,60 @@ class PreProcessData:
             plt.show()
 
 
-
-
-
-
-
-
-
-    def detectOutliers(self, columnName: str, method: str = 'zscore', threshold: float = 3):
-        """Detect outliers in a numerical column using a chosen method.
+    def logTransformData(self, columnName: str):
+        """Transform the selected column using the logTransform method.
         
         Inputs:
-        1. columnName (str)     : Name of the numerical column.
-        2. method (str)         : Method to detect outliers. Options are 'zscore' or 'iqr'.
-        3. threshold (float)    : Threshold for outlier detection.
+        1. the column name. List of columns to be transformed
+        2. Error handles for non-numerical columns or negative values
         """
-
-        if method == 'zscore':
-            meanValue = self.data[columnName].mean()
-            stdValue = self.data[columnName].std()
-            z_scores = (self.data[columnName] - meanValue) / stdValue
-            outliers = self.data[np.abs(z_scores) > threshold]
-            return outliers
-        elif method == 'iqr':
-            Q1 = self.data[columnName].quantile(0.25)
-            Q3 = self.data[columnName].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - (1.5 * IQR)
-            upper_bound = Q3 + (1.5 * IQR)
-            outliers = self.data[(self.data[columnName] < lower_bound) | (self.data[columnName] > upper_bound)]
-            return outliers
-        else:
-            raise ValueError("method must be either 'zscore' or 'iqr'.")
+        
+        if self.data is None:
+            raise ValueError("No data loaded. Please load data using the loadData method.")
+        
+        #If column contains a null value, error
+        if self.data[columnName].isnull().any():
+            raise ValueError("Column contains null values.")
+        #If column is not numeric, error
+        elif self.data[columnName].dtype != 'float64' and self.data[columnName].dtype != 'int64':
+            raise ValueError("Column must be numerical")
+        #If columnn contains a negative value, error
+        elif self.data[columnName].lt(0).any():
+            raise ValueError("Log transform can't take a negative value. ")
     
-    def imputeData(self,
-                   numericalImputeStrategy: str = 'mean',
-                   categoricalImputeStrategy: str = 'most_frequent',
-                   outlierDetectionMethod: str = 'zscore',
-                   treatOutliers: bool = False,
-                   outlierThreshold: float = 3):
-        """Impute missing values in the dataset.
+        new_column = f"{columnName}_log"
+        self.data[new_column] = np.log(self.data[columnName])
+        print("Tranformed colum using log transformation")
+        
+        # Plot historgram of column
+        self.data[new_column].hist()
+        plt.show()
+    
+    def bivariateAnalysis(self):
+        """Perform bivariate analysis using pairplots and correlation heatmaps.
         
         Inputs:
-        1. numericalImputeStrategy (str)    : Strategy to impute missing values in numerical columns.
-              a. 'mean' : Mean imputation.
-              b. 'median' : Median imputation.
-              c. 'most_frequent' : Most frequent value imputation.
-              d. 'constant' : Constant value imputation.
-        2. categoricalImputeStrategy (str)  : Strategy to impute missing values in categorical columns.
-              a. 'most_frequent' : Most frequent value imputation.
-              b. 'constant' : Constant value imputation.
-        3. outlierDetectionMethod (str) : Method to detect outliers. Options are 'zscore' or 'iqr'.
-        4. treatOutliers (bool)        : Whether to treat outliers.
-        5. outlierThreshold (float) : Threshold for outlier detection.
+        1. Pairplots for numerical variables
+        2. Correlation heatmap for numerical variables
         """
 
         if self.data is None:
             raise ValueError("No data loaded. Please load data using the loadData method.")
         
-        # Separate numerical and categorical columns
-        numerical_columns = self.data.select_dtypes(include=['number']).columns
-        
-        # Detect and treat outliers
-        if treatOutliers:
-            for column in numerical_columns:
-                outliersMask = self.detectOutliers(column,
-                                                   method=outlierDetectionMethod,
-                                                   threshold=outlierThreshold)
-                self.data.loc[outliersMask.index, column] = np.nan # Replace outliers with NaN and then impute them later on
-            
-        # Impute numerical data
-        self.numerical_imputer = SimpleImputer(strategy=numericalImputeStrategy)
-        self.data[numerical_columns] = self.numerical_imputer.fit_transform(self.data[numerical_columns])
-        print("Numerical data imputed successfully using strategy = {numericalImputeStrategy}.")
+        numericalColumns = self.data.select_dtypes(include=['float64', 'int64']).columns
+        # Pairplots for numerical variables
+        sns.pairplot(self.data[numericalColumns])
+        plt.show()
 
-        # Impute categorical data
-        categorical_columns = self.data.select_dtypes(include=['object']).columns
-        if len(categorical_columns) == 0:
-            print("No categorical columns found to impute.")
-            return
-        else:
-            self.categorical_imputer = SimpleImputer(strategy=categoricalImputeStrategy)
-            self.data[categorical_columns] = self.categorical_imputer.fit_transform(self.data[categorical_columns])
-            print("Categorical data imputed successfully using strategy = {categoricalImputeStrategy}.")
+        # Correlation Matrix for numerical variables
+        fig = plt.figure(figsize=(12, 8))
+        corrMatrix = self.data[numericalColumns].corr()
+        mask = np.triu(np.ones_like(corrMatrix, dtype=bool)) 
+        sns.heatmap(corrMatrix, annot=True, cmap='viridis', center=0, fmt='.2f', mask=mask, annot_kws={"size": 8})
+        plt.show()
 
+        correlation_matrix = self.data[numericalColumns].corr()
+        np.round(correlation_matrix['is_fraud'].sort_values(ascending=False), 4)
     
     def scaleData(self):
         """Scale numerical data using the specified scaler.
@@ -213,6 +182,9 @@ class PreProcessData:
         self.data[numerical_columns] = self.scaler.fit_transform(self.data[numerical_columns])
         print("Data scaled successfully using {self.scaleType} method.")
     
+
+
+
     def encodeCategoricalData(self, prefix:str = "cat"):
         """Create dummy variables for categorical variables with a user-chosen prefix.
         
@@ -233,26 +205,3 @@ class PreProcessData:
             # Create dummy variables
             self.data = pd.get_dummies(self.data, prefix=prefix, columns=categorical_columns, drop_first=True)
             print("Categorical data encoded successfully using prefix '{prefix}'.")
-    
-    def saveData(self, filePath: str, fileFormat: str='csv'):
-        """Save the processed data to a CSV or Excel file.
-        
-        Inputs:
-        1. filePath (str)       : Path to the file.
-        2. fileFormat (str)     : Format of the file. Options are 'csv' or 'excel'.
-        """
-        if self.data is None:
-            raise ValueError("No data loaded. Please load data using the loadData method.")
-        
-        if fileFormat == 'csv':
-            self.data.to_csv(filePath, index=False)
-        elif fileFormat == 'excel':
-            self.data.to_excel(filePath, index=False)
-        else:
-            raise ValueError("fileFormat must be either 'csv' or 'excel'.")
-        
-        print(f"Data saved successfully to {filePath}.")
-
-    def getData(self):
-        """Return the processed data."""
-        return self.data
