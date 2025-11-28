@@ -195,9 +195,6 @@ class PreProcessData:
         print(vif_data)
 
 
-
-
-
     def standardizeColumn(self, columnName: str):
         """Use StandardScaler to scale a specific column.
         Inputs:
@@ -216,6 +213,7 @@ class PreProcessData:
         # Plot historgram of column
         self.data[new_column].hist()
         plt.show()
+
 
     # from class, encodeCategoricalData
     def encodeCategoricalData(self, prefix:str = "cat"):
