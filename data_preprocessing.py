@@ -161,30 +161,63 @@ class PreProcessData:
         plt.show()
 
         correlation_matrix = self.data[numericalColumns].corr()
-        np.round(correlation_matrix['is_fraud'].sort_values(ascending=False), 4)
-    
-    def scaleData(self):
-        """Scale numerical data using the specified scaler.
-        
-        Inputs:
-        1. scaleType (str)      : The type of scaling to be applied to numerical data. 
-           a. "Standardize"     : StandardScaler.
-           b. "Normalize"       : MinMaxScaler.
+        print(np.round(correlation_matrix['is_fraud'].sort_values(ascending=False), 4))
+
+
+
+    def vifData(self):
+        """Calculate Variance Inflation Factor
+        Need to have statsmodels installed for this function to work.
+        Referencing GeeksforGeeks to make this class and implement this function
+        (GeeksforGeeks, 2025c)
+
+        References:
+        GeeksforGeeks. (2025c, November 20). Detecting Multicollinearity with VIF Python. GeeksforGeeks.
+        https://www.geeksforgeeks.org/python/detecting-multicollinearity-with-vif-python/
         """
+
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+        # Select the numerical columns from the dataframe
+        numericalColumns = self.data.select_dtypes(include=['float64', 'int64']).columns
+
+        # I want to make a dataframe to calculate the vif for
+        vif_data = pd.DataFrame()
+
+        # Making a dataframe of a single Column to hold the numerical columns as rows. Will calculate row by row the VIF
+        vif_data["feature"] = numericalColumns
+
+        # Calculating VIF for each value
+        vif_data["VIF"] = [variance_inflation_factor(self.data[numericalColumns].values, i)
+                                for i in range(len(numericalColumns))]
         
+        # Print the VIF data
+        print(vif_data)
+
+
+
+
+
+    def standardizeColumn(self, columnName: str):
+        """Use StandardScaler to scale a specific column.
+        Inputs:
+       The column name to be scaled.
+        """
+
         if self.data is None:
             raise ValueError("No data loaded. Please load data using the loadData method.")
+
+        new_column = f"{columnName}_scaled"
+
+        scaler = StandardScaler()
+        self.data[new_column] = scaler.fit_transform(self.data[[columnName]])
+        print("Tranformed column using standard scaler")
         
-        # Separate numerical columns
-        numerical_columns = self.data.select_dtypes(include=['number']).columns
-        
-        # Scale numerical data
-        self.data[numerical_columns] = self.scaler.fit_transform(self.data[numerical_columns])
-        print("Data scaled successfully using {self.scaleType} method.")
-    
+        # Plot historgram of column
+        self.data[new_column].hist()
+        plt.show()
 
-
-
+    # from class, encodeCategoricalData
     def encodeCategoricalData(self, prefix:str = "cat"):
         """Create dummy variables for categorical variables with a user-chosen prefix.
         
@@ -192,16 +225,15 @@ class PreProcessData:
         1. prefix (str)        : Prefix for the dummy variable columns.
         
         """
-
         if self.data is None:
             raise ValueError("No data loaded. Please load data using the loadData method.")
         
         # Separate categorical columns
-        categorical_columns = self.data.select_dtypes(include=['object']).columns
+        categorical_columns = self.data.select_dtypes(include=['object', 'category']).columns
         if len(categorical_columns) == 0:
             print("No categorical columns found to encode.")
             return
         else:
-            # Create dummy variables
-            self.data = pd.get_dummies(self.data, prefix=prefix, columns=categorical_columns, drop_first=True)
+            # Create dummy variables, output as int's (0 or 1)
+            self.data = pd.get_dummies(self.data, prefix=prefix, columns=categorical_columns, drop_first=True, dtype=int)
             print("Categorical data encoded successfully using prefix '{prefix}'.")
