@@ -200,7 +200,6 @@ class PreProcessData:
         Inputs:
        The column name to be scaled.
         """
-
         if self.data is None:
             raise ValueError("No data loaded. Please load data using the loadData method.")
 
