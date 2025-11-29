@@ -128,13 +128,14 @@ class PreProcessData:
         #If columnn contains a negative value, error
         elif self.data[columnName].lt(0).any():
             raise ValueError("Log transform can't take a negative value. ")
-    
+
         new_column = f"{columnName}_log"
-        self.data[new_column] = np.log(self.data[columnName])
+        self.data[new_column] = np.log1p(self.data[columnName])
         print("Tranformed colum using log transformation")
         
         # Plot historgram of column
         self.data[new_column].hist()
+        plt.title(f"Histogram of {new_column}")
         plt.show()
     
     def bivariateAnalysis(self):
